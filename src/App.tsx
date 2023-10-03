@@ -1,3 +1,9 @@
+import { Fixed } from "./Fixed/Fixed";
+
 export const App = () => {
-  return <div>helosadasda</div>;
+  return (
+    <div>
+      <Fixed />
+    </div>
+  );
 };
