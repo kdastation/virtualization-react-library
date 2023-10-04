@@ -1,10 +1,27 @@
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
+type Id = string | number;
 
 type Args = {
   itemsCount: number;
-  itemHeight: (index: number) => number;
+  itemHeight?: (index: number) => number;
+  estimateItemHeight?: (index: number) => number;
   overScan?: number;
   getScrollElement: () => HTMLElement | null;
+  getItemId: (index: number) => Id;
+};
+
+const validateProps = (props: Args) => {
+  const { itemHeight, estimateItemHeight } = props;
+
+  if (!itemHeight && !estimateItemHeight) {
+    throw new Error(
+      "you must pass either 'itemHeight' or 'estimateItemHeight' prop",
+    );
+  }
+};
+
+const isNumber = (value: unknown): value is number => {
+  return typeof value === "number";
 };
 
 type Row = {
@@ -12,12 +29,21 @@ type Row = {
   height: number;
   offsetTop: number;
 };
-export const useFixedVirtuoso = ({
-  getScrollElement,
-  itemHeight,
-  itemsCount,
-  overScan = 3,
-}: Args) => {
+export const useVirtuoso = (props: Args) => {
+  const {
+    getScrollElement,
+    itemHeight,
+    itemsCount,
+    overScan = 3,
+    getItemId,
+    estimateItemHeight,
+  } = props;
+
+  validateProps(props);
+
+  const [measurmentCache, setMeasurmentCache] = useState<Record<Id, number>>(
+    {},
+  );
   const [listHeight, setListHeight] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
 
@@ -68,6 +94,19 @@ export const useFixedVirtuoso = ({
   }, [getScrollElement]);
 
   const data = useMemo(() => {
+    const getItemHeight = (index: number) => {
+      if (itemHeight) {
+        return itemHeight(index);
+      }
+
+      const id = getItemId(index);
+
+      if (isNumber(measurmentCache[id])) {
+        return measurmentCache[id]!;
+      }
+
+      return estimateItemHeight!(index);
+    };
     const rangeStart = scrollTop;
     const rangeEnd = scrollTop + listHeight;
 
@@ -77,9 +116,12 @@ export const useFixedVirtuoso = ({
     const allRows: Row[] = Array(itemsCount);
 
     for (let index = 0; index < itemsCount; index += 1) {
+      const id = getItemId(index);
+
       const row = {
+        id,
         index,
-        height: itemHeight(index),
+        height: getItemHeight(index),
         offsetTop: totalHeight,
       };
 
@@ -104,7 +146,42 @@ export const useFixedVirtuoso = ({
       endIndex,
       allItems: allRows,
     };
-  }, [scrollTop, listHeight, itemsCount]);
+  }, [
+    scrollTop,
+    listHeight,
+    itemsCount,
+    estimateItemHeight,
+    itemHeight,
+    measurmentCache,
+  ]);
 
-  return data;
+  const measureElement = useCallback((element: Element | null) => {
+    if (!element) {
+      return;
+    }
+    const index = parseInt(element.getAttribute("data-index") || "", 10);
+
+    if (Number.isNaN(index)) {
+      console.error(
+        "dynamic elements must have a valid `data-index` attribute",
+      );
+      return;
+    }
+
+    const size = element.getBoundingClientRect();
+
+    const id = getItemId(index);
+
+    setMeasurmentCache((prev) => {
+      return {
+        ...prev,
+        [id]: size.height,
+      };
+    });
+  }, []);
+
+  return {
+    ...data,
+    measureElement,
+  };
 };

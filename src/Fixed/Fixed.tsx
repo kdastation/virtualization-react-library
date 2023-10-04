@@ -1,10 +1,11 @@
+import { faker } from "@faker-js/faker";
 import { useCallback, useRef, useState } from "react";
-import { useFixedVirtuoso } from "./useFixedVirtuoso";
+import { useVirtuoso } from "./useVirtuoso";
 
 const createItems = () =>
   Array.from({ length: 10_000 }, (_, index) => ({
     id: Math.random().toString(36).slice(2),
-    text: String(index),
+    text: faker.lorem.text(),
   }));
 
 const CONTAINER_HEIGHT = 600;
@@ -13,10 +14,11 @@ export const Fixed = () => {
   const [listItems, setListItems] = useState(() => createItems());
   const scrollElementRef = useRef<HTMLDivElement>(null);
 
-  const { virtualItems, totalHeight } = useFixedVirtuoso({
-    itemHeight: () => 40 + Math.round(Math.random() * 100),
+  const { virtualItems, totalHeight, measureElement } = useVirtuoso({
+    estimateItemHeight: useCallback(() => 40, []),
     itemsCount: listItems.length,
     getScrollElement: useCallback(() => scrollElementRef.current, []),
+    getItemId: useCallback((index) => listItems[index]!.id, [listItems]),
   });
 
   return (
@@ -36,11 +38,12 @@ export const Fixed = () => {
 
             return (
               <div
+                ref={measureElement}
+                data-index={virtualItem.index}
                 style={{
                   position: "absolute",
                   top: 0,
                   transform: `translateY(${virtualItem.offsetTop}px)`,
-                  height: virtualItem.height,
                   padding: "6px 12px",
                 }}
                 key={item.id}
