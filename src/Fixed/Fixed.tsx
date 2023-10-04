@@ -7,7 +7,6 @@ const createItems = () =>
     text: String(index),
   }));
 
-const ITEM_HEIGHT = 60;
 const CONTAINER_HEIGHT = 600;
 
 export const Fixed = () => {
@@ -15,7 +14,7 @@ export const Fixed = () => {
   const scrollElementRef = useRef<HTMLDivElement>(null);
 
   const { virtualItems, totalHeight } = useFixedVirtuoso({
-    itemHeight: ITEM_HEIGHT,
+    itemHeight: () => 40 + Math.round(Math.random() * 100),
     itemsCount: listItems.length,
     getScrollElement: useCallback(() => scrollElementRef.current, []),
   });
@@ -41,7 +40,7 @@ export const Fixed = () => {
                   position: "absolute",
                   top: 0,
                   transform: `translateY(${virtualItem.offsetTop}px)`,
-                  height: ITEM_HEIGHT,
+                  height: virtualItem.height,
                   padding: "6px 12px",
                 }}
                 key={item.id}
