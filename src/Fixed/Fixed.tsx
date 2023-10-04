@@ -17,7 +17,6 @@ export const Fixed = () => {
   const { virtualItems, totalHeight } = useFixedVirtuoso({
     itemHeight: ITEM_HEIGHT,
     itemsCount: listItems.length,
-    listHeight: CONTAINER_HEIGHT,
     getScrollElement: useCallback(() => scrollElementRef.current, []),
   });
 
@@ -26,7 +25,7 @@ export const Fixed = () => {
       <div
         ref={scrollElementRef}
         style={{
-          height: CONTAINER_HEIGHT,
+          maxHeight: CONTAINER_HEIGHT,
           overflow: "auto",
           border: "1px solid lightgrey",
           position: "relative",
