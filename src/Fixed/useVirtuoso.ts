@@ -1,4 +1,11 @@
-import { useCallback, useLayoutEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useInsertionEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 type Id = string | number;
 
 type Args = {
@@ -22,6 +29,16 @@ const validateProps = (props: Args) => {
 
 const isNumber = (value: unknown): value is number => {
   return typeof value === "number";
+};
+
+const useLatest = <Value>(value: Value) => {
+  const valueRef = useRef(value);
+
+  useInsertionEffect(() => {
+    valueRef.current = value;
+  });
+
+  return valueRef;
 };
 
 type Row = {
@@ -155,30 +172,86 @@ export const useVirtuoso = (props: Args) => {
     measurmentCache,
   ]);
 
-  const measureElement = useCallback((element: Element | null) => {
-    if (!element) {
-      return;
-    }
-    const index = parseInt(element.getAttribute("data-index") || "", 10);
+  const latestData = useLatest({ getItemId, measurmentCache });
 
-    if (Number.isNaN(index)) {
-      console.error(
-        "dynamic elements must have a valid `data-index` attribute",
-      );
-      return;
-    }
+  const itemsResizeObserver = useMemo(() => {
+    const resizeObserver = new ResizeObserver((entries) => {
+      entries.forEach((entry) => {
+        const element = entry.target;
 
-    const size = element.getBoundingClientRect();
+        if (!element.isConnected) {
+          resizeObserver.unobserve(element);
+          return;
+        }
 
-    const id = getItemId(index);
+        const index = parseInt(element.getAttribute("data-index") || "", 10);
 
-    setMeasurmentCache((prev) => {
-      return {
-        ...prev,
-        [id]: size.height,
-      };
+        if (Number.isNaN(index)) {
+          console.error(
+            "dynamic elements must have a valid `data-index` attribute",
+          );
+          return;
+        }
+
+        const height =
+          entry.borderBoxSize[0]?.blockSize ??
+          element.getBoundingClientRect().height;
+
+        const { measurmentCache, getItemId } = latestData.current;
+
+        const id = getItemId(index);
+
+        if (measurmentCache[id] === height) {
+          return;
+        }
+
+        setMeasurmentCache((prev) => {
+          return {
+            ...prev,
+            [id]: height,
+          };
+        });
+      });
     });
-  }, []);
+
+    return resizeObserver;
+  }, [latestData]);
+
+  const measureElement = useCallback(
+    (element: Element | null) => {
+      if (!element) {
+        return;
+      }
+      const index = parseInt(element.getAttribute("data-index") || "", 10);
+
+      if (Number.isNaN(index)) {
+        console.error(
+          "dynamic elements must have a valid `data-index` attribute",
+        );
+        return;
+      }
+
+      const size = element.getBoundingClientRect();
+
+      const { measurmentCache, getItemId } = latestData.current;
+
+      const id = getItemId(index);
+
+      itemsResizeObserver.observe(element);
+
+      if (isNumber(measurmentCache[id])) {
+        return;
+      }
+
+      setMeasurmentCache((prev) => {
+        return {
+          ...prev,
+          [id]: size.height,
+        };
+      });
+    },
+    [itemsResizeObserver, latestData],
+  );
 
   return {
     ...data,
