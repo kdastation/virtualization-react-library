@@ -181,71 +181,25 @@ export const useVirtuoso = (props: Args) => {
     scrollTop,
   });
 
-  const itemsResizeObserver = useMemo(() => {
-    const resizeObserver = new ResizeObserver((entries) => {
-      entries.forEach((entry) => {
-        const element = entry.target;
-
-        if (!element.isConnected) {
-          resizeObserver.unobserve(element);
-          return;
-        }
-
-        const index = parseInt(element.getAttribute("data-index") || "", 10);
-
-        if (Number.isNaN(index)) {
-          console.error(
-            "dynamic elements must have a valid `data-index` attribute",
-          );
-          return;
-        }
-
-        const height =
-          entry.borderBoxSize[0]?.blockSize ??
-          element.getBoundingClientRect().height;
-
-        const {
-          measurmentCache,
-          getItemId,
-          allItems,
-          getScrollElement,
-          scrollTop,
-        } = latestData.current;
-
-        const id = getItemId(index);
-
-        if (measurmentCache[id] === height) {
-          return;
-        }
-
-        const item = allItems[index]!;
-
-        const delta = height - item!.height;
-
-        if (delta !== 0 && scrollTop > item.offsetTop) {
-          const element = getScrollElement();
-          if (element) {
-            element.scrollBy(0, delta);
-          }
-        }
-
-        setMeasurmentCache((prev) => {
-          return {
-            ...prev,
-            [id]: height,
-          };
-        });
-      });
-    });
-
-    return resizeObserver;
-  }, [latestData]);
-
-  const measureElement = useCallback(
-    (element: Element | null) => {
+  const measureElementInner = useCallback(
+    ({
+      element,
+      resizeObserver,
+      entry,
+    }: {
+      element: Element | null;
+      resizeObserver: ResizeObserver;
+      entry?: ResizeObserverEntry;
+    }) => {
       if (!element) {
         return;
       }
+
+      if (!element.isConnected) {
+        resizeObserver.unobserve(element);
+        return;
+      }
+
       const index = parseInt(element.getAttribute("data-index") || "", 10);
 
       if (Number.isNaN(index)) {
@@ -255,22 +209,29 @@ export const useVirtuoso = (props: Args) => {
         return;
       }
 
-      const size = element.getBoundingClientRect();
-
-      const { measurmentCache, getItemId, allItems, getScrollElement } =
+      const { measurmentCache, getItemId, allItems, scrollTop } =
         latestData.current;
 
       const id = getItemId(index);
 
-      itemsResizeObserver.observe(element);
+      const isResize = Boolean(entry);
 
-      if (isNumber(measurmentCache[id])) {
+      resizeObserver.observe(element);
+
+      if (!isResize && isNumber(measurmentCache[id])) {
+        return;
+      }
+
+      const height =
+        entry?.borderBoxSize[0]?.blockSize ??
+        element.getBoundingClientRect().height;
+
+      if (measurmentCache[id] === height) {
         return;
       }
 
       const item = allItems[index]!;
-
-      const delta = size.height - item.height;
+      const delta = height - item.height;
 
       if (delta !== 0 && scrollTop > item.offsetTop) {
         const element = getScrollElement();
@@ -279,14 +240,30 @@ export const useVirtuoso = (props: Args) => {
         }
       }
 
-      setMeasurmentCache((prev) => {
-        return {
-          ...prev,
-          [id]: size.height,
-        };
-      });
+      setMeasurmentCache((cache) => ({ ...cache, [id]: height }));
     },
-    [itemsResizeObserver, latestData],
+    [],
+  );
+
+  const itemsResizeObserver = useMemo(() => {
+    const resizeObserver = new ResizeObserver((entries) => {
+      entries.forEach((entry) => {
+        measureElementInner({
+          element: entry.target,
+          resizeObserver: resizeObserver,
+          entry,
+        });
+      });
+    });
+
+    return resizeObserver;
+  }, []);
+
+  const measureElement = useCallback(
+    (element: Element | null) => {
+      measureElementInner({ element, resizeObserver: itemsResizeObserver });
+    },
+    [itemsResizeObserver],
   );
 
   return {
