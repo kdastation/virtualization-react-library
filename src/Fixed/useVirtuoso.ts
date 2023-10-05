@@ -110,69 +110,76 @@ export const useVirtuoso = (props: Args) => {
     return () => scrollElement.removeEventListener("scroll", handleScroll);
   }, [getScrollElement]);
 
-  const data = useMemo(() => {
-    const getItemHeight = (index: number) => {
-      if (itemHeight) {
-        return itemHeight(index);
-      }
+  const { allItems, totalHeight, startIndex, endIndex, virtualItems } =
+    useMemo(() => {
+      const getItemHeight = (index: number) => {
+        if (itemHeight) {
+          return itemHeight(index);
+        }
 
-      const id = getItemId(index);
+        const id = getItemId(index);
 
-      if (isNumber(measurmentCache[id])) {
-        return measurmentCache[id]!;
-      }
+        if (isNumber(measurmentCache[id])) {
+          return measurmentCache[id]!;
+        }
 
-      return estimateItemHeight!(index);
-    };
-    const rangeStart = scrollTop;
-    const rangeEnd = scrollTop + listHeight;
-
-    let totalHeight = 0;
-    let startIndex = -1;
-    let endIndex = -1;
-    const allRows: Row[] = Array(itemsCount);
-
-    for (let index = 0; index < itemsCount; index += 1) {
-      const id = getItemId(index);
-
-      const row = {
-        id,
-        index,
-        height: getItemHeight(index),
-        offsetTop: totalHeight,
+        return estimateItemHeight!(index);
       };
+      const rangeStart = scrollTop;
+      const rangeEnd = scrollTop + listHeight;
 
-      totalHeight += row.height;
-      allRows[index] = row;
+      let totalHeight = 0;
+      let startIndex = -1;
+      let endIndex = -1;
+      const allRows: Row[] = Array(itemsCount);
 
-      if (startIndex === -1 && row.offsetTop + row.height > rangeStart) {
-        startIndex = Math.max(0, index - overScan);
+      for (let index = 0; index < itemsCount; index += 1) {
+        const id = getItemId(index);
+
+        const row = {
+          id,
+          index,
+          height: getItemHeight(index),
+          offsetTop: totalHeight,
+        };
+
+        totalHeight += row.height;
+        allRows[index] = row;
+
+        if (startIndex === -1 && row.offsetTop + row.height > rangeStart) {
+          startIndex = Math.max(0, index - overScan);
+        }
+
+        if (endIndex === -1 && row.offsetTop + row.height >= rangeEnd) {
+          endIndex = Math.min(itemsCount - 1, index + overScan);
+        }
       }
 
-      if (endIndex === -1 && row.offsetTop + row.height >= rangeEnd) {
-        endIndex = Math.min(itemsCount - 1, index + overScan);
-      }
-    }
+      const virtualRows = allRows.slice(startIndex, endIndex + 1);
 
-    const virtualRows = allRows.slice(startIndex, endIndex + 1);
+      return {
+        virtualItems: virtualRows,
+        totalHeight,
+        startIndex,
+        endIndex,
+        allItems: allRows,
+      };
+    }, [
+      scrollTop,
+      listHeight,
+      itemsCount,
+      estimateItemHeight,
+      itemHeight,
+      measurmentCache,
+    ]);
 
-    return {
-      virtualItems: virtualRows,
-      totalHeight,
-      startIndex,
-      endIndex,
-      allItems: allRows,
-    };
-  }, [
-    scrollTop,
-    listHeight,
-    itemsCount,
-    estimateItemHeight,
-    itemHeight,
+  const latestData = useLatest({
+    getItemId,
     measurmentCache,
-  ]);
-
-  const latestData = useLatest({ getItemId, measurmentCache });
+    allItems,
+    getScrollElement,
+    scrollTop,
+  });
 
   const itemsResizeObserver = useMemo(() => {
     const resizeObserver = new ResizeObserver((entries) => {
@@ -197,12 +204,29 @@ export const useVirtuoso = (props: Args) => {
           entry.borderBoxSize[0]?.blockSize ??
           element.getBoundingClientRect().height;
 
-        const { measurmentCache, getItemId } = latestData.current;
+        const {
+          measurmentCache,
+          getItemId,
+          allItems,
+          getScrollElement,
+          scrollTop,
+        } = latestData.current;
 
         const id = getItemId(index);
 
         if (measurmentCache[id] === height) {
           return;
+        }
+
+        const item = allItems[index]!;
+
+        const delta = height - item!.height;
+
+        if (delta !== 0 && scrollTop > item.offsetTop) {
+          const element = getScrollElement();
+          if (element) {
+            element.scrollBy(0, delta);
+          }
         }
 
         setMeasurmentCache((prev) => {
@@ -233,7 +257,8 @@ export const useVirtuoso = (props: Args) => {
 
       const size = element.getBoundingClientRect();
 
-      const { measurmentCache, getItemId } = latestData.current;
+      const { measurmentCache, getItemId, allItems, getScrollElement } =
+        latestData.current;
 
       const id = getItemId(index);
 
@@ -241,6 +266,17 @@ export const useVirtuoso = (props: Args) => {
 
       if (isNumber(measurmentCache[id])) {
         return;
+      }
+
+      const item = allItems[index]!;
+
+      const delta = size.height - item.height;
+
+      if (delta !== 0 && scrollTop > item.offsetTop) {
+        const element = getScrollElement();
+        if (element) {
+          element.scrollBy(0, delta);
+        }
       }
 
       setMeasurmentCache((prev) => {
@@ -254,7 +290,11 @@ export const useVirtuoso = (props: Args) => {
   );
 
   return {
-    ...data,
+    allItems,
+    virtualItems,
+    totalHeight,
+    startIndex,
+    endIndex,
     measureElement,
   };
 };

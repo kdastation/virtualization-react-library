@@ -5,7 +5,10 @@ import { useVirtuoso } from "./useVirtuoso";
 const createItems = () =>
   Array.from({ length: 10_000 }, (_, index) => ({
     id: Math.random().toString(36).slice(2),
-    text: faker.lorem.text(),
+    text: faker.lorem.paragraphs({
+      min: 3,
+      max: 6,
+    }),
   }));
 
 const CONTAINER_HEIGHT = 600;
@@ -15,7 +18,7 @@ export const Fixed = () => {
   const scrollElementRef = useRef<HTMLDivElement>(null);
 
   const { virtualItems, totalHeight, measureElement } = useVirtuoso({
-    estimateItemHeight: useCallback(() => 40, []),
+    estimateItemHeight: useCallback(() => 16, []),
     itemsCount: listItems.length,
     getScrollElement: useCallback(() => scrollElementRef.current, []),
     getItemId: useCallback((index) => listItems[index]!.id, [listItems]),
@@ -48,7 +51,7 @@ export const Fixed = () => {
                 }}
                 key={item.id}
               >
-                {item.text}
+                {virtualItem.index} {item.text}
               </div>
             );
           })}
