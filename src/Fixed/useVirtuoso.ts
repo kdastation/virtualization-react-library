@@ -1,11 +1,6 @@
-import {
-  useCallback,
-  useInsertionEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
+import { useResizeObserver } from "../lib/hooks/useResizeObserver";
+import { useLatest } from "../lib/hooks/useLatest";
 type Id = string | number;
 
 type Args = {
@@ -29,16 +24,6 @@ const validateProps = (props: Args) => {
 
 const isNumber = (value: unknown): value is number => {
   return typeof value === "number";
-};
-
-const useLatest = <Value>(value: Value) => {
-  const valueRef = useRef(value);
-
-  useInsertionEffect(() => {
-    valueRef.current = value;
-  });
-
-  return valueRef;
 };
 
 type Row = {
@@ -245,19 +230,15 @@ export const useVirtuoso = (props: Args) => {
     [],
   );
 
-  const itemsResizeObserver = useMemo(() => {
-    const resizeObserver = new ResizeObserver((entries) => {
-      entries.forEach((entry) => {
-        measureElementInner({
-          element: entry.target,
-          resizeObserver: resizeObserver,
-          entry,
-        });
+  const itemsResizeObserver = useResizeObserver((entries, observer) => {
+    entries.forEach((entry) => {
+      measureElementInner({
+        element: entry.target,
+        resizeObserver: observer,
+        entry,
       });
     });
-
-    return resizeObserver;
-  }, []);
+  });
 
   const measureElement = useCallback(
     (element: Element | null) => {
