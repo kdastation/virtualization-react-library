@@ -1,9 +1,9 @@
 import { faker } from "@faker-js/faker";
 import { useCallback, useRef, useState } from "react";
-import { useVirtuoso } from "./useVirtuoso";
+import { useVirtuoso } from "../useVirtuoso/useVirtuoso";
 
 const createItems = () =>
-  Array.from({ length: 10_000 }, (_, index) => ({
+  Array.from({ length: 10_000 }, () => ({
     id: Math.random().toString(36).slice(2),
     text: faker.lorem.paragraphs({
       min: 3,
@@ -13,8 +13,8 @@ const createItems = () =>
 
 const CONTAINER_HEIGHT = 600;
 
-export const Fixed = () => {
-  const [listItems, setListItems] = useState(() => createItems());
+export const Example = () => {
+  const [listItems] = useState(() => createItems());
   const scrollElementRef = useRef<HTMLDivElement>(null);
 
   const { virtualItems, totalHeight, measureElement } = useVirtuoso({
