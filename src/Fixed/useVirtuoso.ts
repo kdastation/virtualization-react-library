@@ -1,4 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
+import { scheduleDOMUpdate } from "../lib/domUtils/scheduleDOMUpdate";
+import { rafThrottle } from "../lib/rafThrottle/rafThrottle";
+import { isNumber } from "../lib/sharedUtils";
 import { useResizeObserver } from "../lib/hooks/useResizeObserver";
 import { useLatest } from "../lib/hooks/useLatest";
 type Id = string | number;
@@ -20,10 +23,6 @@ const validateProps = (props: Args) => {
       "you must pass either 'itemHeight' or 'estimateItemHeight' prop",
     );
   }
-};
-
-const isNumber = (value: unknown): value is number => {
-  return typeof value === "number";
 };
 
 type Row = {
@@ -90,9 +89,12 @@ export const useVirtuoso = (props: Args) => {
 
     handleScroll();
 
-    scrollElement.addEventListener("scroll", handleScroll);
+    const throttledHandleScroll = rafThrottle(handleScroll);
 
-    return () => scrollElement.removeEventListener("scroll", handleScroll);
+    scrollElement.addEventListener("scroll", throttledHandleScroll);
+
+    return () =>
+      scrollElement.removeEventListener("scroll", throttledHandleScroll);
   }, [getScrollElement]);
 
   const { allItems, totalHeight, startIndex, endIndex, virtualItems } =
@@ -221,7 +223,9 @@ export const useVirtuoso = (props: Args) => {
       if (delta !== 0 && scrollTop > item.offsetTop) {
         const element = getScrollElement();
         if (element) {
-          element.scrollBy(0, delta);
+          scheduleDOMUpdate(() => {
+            element.scrollBy(0, delta);
+          });
         }
       }
 
